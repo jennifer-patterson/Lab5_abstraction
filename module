@@ -27,14 +27,28 @@ def get_coordinates(filename,lat,lon,elev):
 
     return data[lat].mean(), data[lon].mean(), data[elev].mean()
 
-def fit_all_velocities(folder, pattern, tname, ename, nname, uname, lat, lon, elev):
+def fit_all_velocities(folder, pattern, tname, ename, nname, uname, lat, lon, elev, type):
     results = []
 
     for filename in glob.glob(f'{folder}/{pattern}'):
-        site_coords = get_coordinates(filename,lat,lon,elev)
-        site,vE,vN,vU,uncE,uncN,uncU = fit_velocities(filename, tname, ename, nname, uname)
-
-        results.append([site, *site_coords, vE,vN,vU,uncE,uncN,uncU])
-
-    df = pd.DataFrame(results, columns=['Site', 'Latitude', 'Longitude', 'Elevation', 'E Velocity', 'N Velocity', 'U Velocity', 'E Uncertainty', 'N Uncertainty', 'U Uncertainty'])
+        if type == 'GNSS':
+            site_coords = get_coordinates(filename,lat,lon,elev)
+            site,vE,vN,vU,uncE,uncN,uncU = fit_velocities(filename, tname, ename, nname, uname)
+            results.append([site, *site_coords, vE,vN,vU,uncE,uncN,uncU])  # * unpacks
+        elif type == 'tide':
+            station,vS,uncS = fit_tide_gauge(filename)
+            results.append([station,vS,uncS])
+            
+    if type == 'GNSS':
+        df = pd.DataFrame(results, columns=['Site', 'Latitude', 'Longitude', 'Elevation', 'E Velocity', 'N Velocity', 'U Velocity', 'E Uncertainty', 'N Uncertainty', 'U Uncertainty'])
+    elif type == 'tide':
+        df = pd.DataFrame(results, columns=['Station', 'S Velocity', 'S Uncertainty'])
+        
     return df
+    
+def fit_tide_gauge(filename):
+    data = pd.read_csv(filename, delimiter = ';', header=None)
+    station = filename.split('/')[-1]  # get the station name from the filename
+    coeffs_S = fit_timeseries(data.iloc[:,0], data.iloc[:,1])   # iloc means find this location
+    
+    return station, coeffs_S[0], coeffs_S[1]
