@@ -1,0 +1,54 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import glob
+
+def fit_timeseries(tlist, ylist):
+    ones = np.ones(np.shape(tlist))
+    G = np.column_stack((ones, tlist))
+    m = np.linalg.inv(np.transpose(G).dot(G)).dot(np.transpose(G)).dot(ylist)
+
+    uncertainty = np.std(ylist, ddof=1) / np.sqrt(np.size(ylist))  #ddof = delta degrees of freedom
+    #uncertainty is calculated with standard error formula
+    
+    return m[1], uncertainty
+   
+def fit_velocities(filename,tname,ename,nname,uname):
+    data = pd.read_csv(filename,delim_whitespace=True)
+    site = data['site'][0]
+    coeffs_E = fit_timeseries(data[tname], data[ename])
+    coeffs_N = fit_timeseries(data[tname], data[nname])
+    coeffs_U = fit_timeseries(data[tname], data[uname])
+    
+    return site, coeffs_E[0], coeffs_N[0], coeffs_U[0],  coeffs_E[1], coeffs_N[1], coeffs_U[1] 
+
+def get_coordinates(filename,lat,lon,elev):
+    data = pd.read_csv(filename,delim_whitespace=True)
+
+    return data[lat].mean(), data[lon].mean(), data[elev].mean()
+
+def fit_all_velocities(folder, pattern, tname, ename, nname, uname, lat, lon, elev, type):
+    results = []
+
+    for filename in glob.glob(f'{folder}/{pattern}'):
+        if type == 'GNSS':
+            site_coords = get_coordinates(filename,lat,lon,elev)
+            site,vE,vN,vU,uncE,uncN,uncU = fit_velocities(filename, tname, ename, nname, uname)
+            results.append([site, *site_coords, vE,vN,vU,uncE,uncN,uncU])  # * unpacks
+        elif type == 'tide':
+            station,vS,uncS = fit_tide_gauge(filename)
+            results.append([station,vS,uncS])
+            
+    if type == 'GNSS':
+        df = pd.DataFrame(results, columns=['Site', 'Latitude', 'Longitude', 'Elevation', 'E Velocity', 'N Velocity', 'U Velocity', 'E Uncertainty', 'N Uncertainty', 'U Uncertainty'])
+    elif type == 'tide':
+        df = pd.DataFrame(results, columns=['Station', 'S Velocity', 'S Uncertainty'])
+        
+    return df
+    
+def fit_tide_gauge(filename):
+    data = pd.read_csv(filename, delimiter = ';', header=None)
+    station = filename.split('/')[-1]  # get the station name from the filename
+    coeffs_S = fit_timeseries(data.iloc[:,0], data.iloc[:,1])   # iloc means find this location
+    
+    return station, coeffs_S[0], coeffs_S[1]
