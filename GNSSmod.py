@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
+import cartopy.crs as ccrs
+
 
 def fit_timeseries(tlist, ylist):
     ones = np.ones(np.shape(tlist))
@@ -52,3 +54,35 @@ def fit_tide_gauge(filename):
     coeffs_S = fit_timeseries(data.iloc[:,0], data.iloc[:,1])   # iloc means find this location
     
     return station, coeffs_S[0], coeffs_S[1]
+
+def plot_velocity_map(df):
+    fig, ax = plt.subplots(subplot_kw = {'projection': ccrs.PlateCarree()},
+                          figsize = (12,6))
+    ax.quiver(df['Longitude'], 
+              df['Latitude'], 
+              df['E Velocity'], 
+              df['N Velocity'], 
+              angles='xy', 
+              scale_units='xy', 
+              scale=0.004, 
+              label='EN Velocity'
+             )
+    scatter = ax.scatter(df['Longitude'], 
+                         df['Latitude'], 
+                         c=df['U Velocity'], 
+                         cmap='coolwarm', 
+                         label='U Velocity', 
+                         marker='o'
+                        )
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_title('Velocity Map')
+    cbar = plt.colorbar(scatter, 
+                        ax=ax, 
+                        shrink = 0.75
+                       )
+    cbar.set_label('U Velocity')
+    ax.legend()
+    ax.set_extent([-108.5, -105.5, 33, 39])
+    ax.gridlines(draw_labels=True)
+    plt.show()
